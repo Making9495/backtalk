@@ -54,6 +54,29 @@ Two engines, and the setup wizard offers you both instead of quietly defaulting.
 
 **ElevenLabs, the natural one.** The human-sounding voice most people actually want, on your own API key. The free tier is enough to audition it; day-to-day talking runs on the paid starter plan. The wizard walks the whole thing with you: account, key into the keychain, then an audition of real voices through backtalk's own mouth until one fits. Want the exact voice from my videos? It's called **Tarquin** in the ElevenLabs voice library: search it by name and you're done hunting. Under the hood it is: set `elevenlabs.enabled` and your `voice_id` in the config, and have `ffmpeg` installed. **The key never goes in a file.** On macOS, seed it into the Keychain once with `security add-generic-password -a "$USER" -s backtalk-elevenlabs -T /usr/bin/security -w` (it prompts for the secret) and backtalk reads it from there. Linux: `secret-tool store --label backtalk service backtalk-elevenlabs`. The `ELEVENLABS_API_KEY` environment variable works as a last resort, but an export in a shell profile is a plaintext key on disk; the keychain is the grown-up path. Kokoro stays wired in as the automatic fallback, so if the cloud fails the voice degrades instead of going mute, and `logs/backtalk.log` records why.
 
+## The brain
+
+Three choices, set with `brain` in `backtalk.json`:
+
+- **`"claude"`** (the default): your Claude Code agent, tools and all. Nothing changes from the classic setup.
+- **`"local"`**: a model running on your own machine, through any OpenAI-compatible server (Ollama, llama.cpp's `llama-server`, vLLM, LM Studio). It's free and private, and it can only talk. It can't open files, run commands or browse, so the permission check never fires. It reads your agent's `CLAUDE.md`, so it's the same character.
+- **`"routed"`**: the local model answers by default and hands a turn to Claude when it sounds like real work: a word like "file", "run", "email" or "look up", or a sentence that starts with "think harder". "Switch to the deep model" sends every turn to Claude until "back to the fast model". Each one is told what the other said, so follow-up questions still work. The rules are lists in the `router` block, so you can read and edit them.
+
+Quick start with Ollama:
+
+```
+ollama pull llama3.1:8b
+```
+
+then in `backtalk.json`:
+
+```json
+"brain": "routed",
+"local": { "model": "llama3.1:8b" }
+```
+
+Size the model to your graphics card, because it shares memory with speech recognition and the voice. An 8B model at 4-bit (about 5 GB) fits an 8 GB card. A 4B model replies faster still. For voice, pick a model without a thinking step: backtalk hides `<think>` output, but you still wait in silence while the model thinks. "Set effort" only works on Claude, and the local model says so when you ask.
+
 ## Give it a face (optional)
 
 backtalk writes tiny state files while it listens, thinks, and speaks, so anything can watch them and react in real time.

@@ -62,7 +62,8 @@ import threading
 import time
 
 from backtalk import signals
-from backtalk.brain import WarmBrain
+from backtalk.brains import Brain, Decision, make_brain
+from backtalk.brains.base import CAP_COMPACT, CAP_EFFORT, CAP_MODELS
 from backtalk.config import CFG
 from backtalk.ears import (Ears, explain_audio_failure, record_held,
                            warm as warm_ears)
@@ -211,12 +212,9 @@ def _full_detail(tool, tool_input, ctx):
 
 
 def make_permission_gate(mouth):
-    from claude_agent_sdk import (PermissionResultAllow,
-                                  PermissionResultDeny)
-
     async def gate(tool, tool_input, ctx):
         if _AUTOAPPROVE["on"]:
-            return PermissionResultAllow(behavior="allow")
+            return Decision(allow=True)
         what = _human_what(tool, tool_input, ctx)
         detail = _full_detail(tool, tool_input, ctx)
         loop = asyncio.get_running_loop()
@@ -251,12 +249,11 @@ def make_permission_gate(mouth):
                             fut.cancel()
                             mouth.say("No answer, so I didn't do it.")
                             log("[perm]   timed out, denied")
-                            return PermissionResultDeny(
-                                behavior="deny",
+                            return Decision(
+                                allow=False,
                                 message="No spoken answer within the "
                                         "timeout; the action was not "
-                                        "approved.",
-                                interrupt=False)
+                                        "approved.")
                         # keep the ring honest while we wait
                         if not mouth.speaking:
                             signals.set_state("listening")
@@ -275,23 +272,21 @@ def make_permission_gate(mouth):
             _PERM["fut"] = None
         if answer == _INTERRUPT_ANSWER:
             log("[perm]   turn interrupted, denied silently")
-            return PermissionResultDeny(
-                behavior="deny",
+            return Decision(
+                allow=False,
                 message="Interrupted by the user; the turn is being "
-                        "cancelled.",
-                interrupt=False)
+                        "cancelled.")
         approved = _norm_speech(answer) in _YES
         # the model keeps working either way: restore the working state
         signals.set_state("thinking")
         signals.static_start()
         if approved:
             log("[perm]   approved by voice")
-            return PermissionResultAllow(behavior="allow")
+            return Decision(allow=True)
         log(f"[perm]   denied: {answer!r}")
-        return PermissionResultDeny(
-            behavior="deny",
-            message=f'Denied by voice. The user said: "{answer[:500]}"',
-            interrupt=False)
+        return Decision(
+            allow=False,
+            message=f'Denied by voice. The user said: "{answer[:500]}"')
     return gate
 
 
@@ -372,7 +367,7 @@ def _fmt_tokens(n):
     return f"{n} tokens"
 
 
-def _spoken_usage(sess, ctx_usage):
+def _spoken_usage(sess, context_tokens):
     """A short CFO brief of the session, written for the ear: plain
     numerals only (the TTS reads "40" fine; symbols come out garbled)."""
     turns = sess["turns"]
@@ -382,20 +377,9 @@ def _spoken_usage(sess, ctx_usage):
     if cents >= 1:
         parts.append(f"roughly {cents} cents" if cents < 100
                      else f"roughly {round(cents / 100)} dollars")
-    try:
-        cats = (getattr(ctx_usage, "categories", None)
-                or (ctx_usage or {}).get("categories") or [])
-        # the breakdown includes "Free space" and the autocompact
-        # buffer; only OCCUPIED categories belong in the spoken number
-        total = sum(int(c.get("tokens") or 0) for c in cats
-                    if isinstance(c, dict)
-                    and "free" not in str(c.get("name", "")).lower()
-                    and "buffer" not in str(c.get("name", "")).lower())
-        if total:
-            parts.append(_fmt_tokens(total)
-                         + " sitting in the context window")
-    except Exception:
-        pass
+    if context_tokens:
+        parts.append(_fmt_tokens(context_tokens)
+                     + " sitting in the context window")
     return ". ".join(parts) + "."
 
 _PASTE_ON = "\x1b[200~"    # bracketed-paste markers (we enable the mode below)
@@ -579,7 +563,7 @@ def _typed_reader(q: "queue.Queue[str]"):
                 sys.stdout.flush()
 
 
-async def speak_reply(brain: WarmBrain, mouth: Mouth, text: str):
+async def speak_reply(brain: Brain, mouth: Mouth, text: str):
     """First sentence ships alone (fast start); the rest go in
     2-sentence breaths — fuller chunks get livelier prosody (single
     short sentences come out flat)."""
@@ -656,7 +640,7 @@ async def amain():
     resume_id = None
     if CFG.get("resume_last_session"):
         try:
-            from backtalk.brain import SESSION_FILE
+            from backtalk.brains.claude import SESSION_FILE
             with open(SESSION_FILE) as f:
                 resume_id = f.read().strip() or None
         except OSError:
@@ -664,9 +648,8 @@ async def amain():
 
     mouth = Mouth()
     ears = Ears()
-    brain = WarmBrain(model=model,
-                      can_use_tool=make_permission_gate(mouth),
-                      resume_id=resume_id)
+    brain = make_brain(model=model, gate=make_permission_gate(mouth),
+                       resume_id=resume_id)
 
     mode = ("hands-free listening (the talk key still works)"
             if _MIC["mode"] == "open"
@@ -699,11 +682,18 @@ async def amain():
         kind = ("timed out" if isinstance(e, asyncio.TimeoutError)
                 else f"failed: {e!r}"[:220])
         log(f"[backtalk] BRAIN CONNECT {kind}")
-        mouth.say("Bad news. The voice and the face are fine, but I "
-                  "couldn't reach my brain, the Claude Code session. "
-                  "Check this window for the error. The usual causes: "
-                  "Claude Code isn't signed in, the internet is down, "
-                  "or the plan is out of usage.")
+        if "local model server" not in str(e):     # LocalBrain.start()
+            mouth.say("Bad news. The voice and the face are fine, but I "
+                      "couldn't reach my brain, the Claude Code session. "
+                      "Check this window for the error. The usual causes: "
+                      "Claude Code isn't signed in, the internet is down, "
+                      "or the plan is out of usage.")
+        else:
+            mouth.say("Bad news. The voice and the face are fine, but I "
+                      "couldn't reach my brain, the local model server. "
+                      "Check this window for the error. The usual causes: "
+                      "the server isn't running, the address in the "
+                      "config is wrong, or the model isn't downloaded.")
         mouth.wait_done(timeout=30)
         raise SystemExit(1)
     log("[backtalk] brain warm")
@@ -712,8 +702,8 @@ async def amain():
     # a configured effort level applies at launch (saved by the spoken
     # "set effort to X", or written by the person's agent on request)
     boot_effort = str(CFG.get("effort") or "").strip().lower()
-    if boot_effort in _EFFORTS:
-        await brain.command(f"/effort {boot_effort}")
+    if boot_effort in _EFFORTS and CAP_EFFORT in brain.capabilities:
+        await brain.set_effort(boot_effort)
         log(f"[backtalk] effort set to {boot_effort} (from config)")
     elif boot_effort:
         log(f"[backtalk] ignoring unknown effort {boot_effort!r} in config")
@@ -739,25 +729,43 @@ async def amain():
         _deny_pending()
         await brain.reset_turn()
         say_after = None
+        # A verb the current brain can't do is said out loud, never sent:
+        # the local model has no /effort, and no deep model unless one is
+        # configured.
+        needs = {"compact": CAP_COMPACT, "deep": CAP_MODELS,
+                 "fast": CAP_MODELS}.get(
+                     verb.split(":", 1)[0],
+                     CAP_EFFORT if verb.startswith("effort:") else None)
+        if needs and needs not in brain.capabilities:
+            mouth.say("That one isn't available on the local model.")
+            signals.set_state("idle")
+            return
         if verb == "clear":
-            resp = await brain.command("/clear")
+            resp = await brain.clear()
             say_after = "Cleared. Fresh slate."
         elif verb == "compact":
             mouth.say("Compacting. One moment.")
-            resp = await brain.command("/compact")
+            resp = await brain.compact()
             say_after = "Compacted. Same conversation, smaller footprint."
         elif verb == "deep":
-            mouth.say("Switching to the deep model. Heads up, replies "
-                      "get slower. Say back to the fast model when "
-                      "you're done.")
-            resp = await brain.command(f"/model {CFG['deep_model']}")
-            say_after = "Deep model online, for this session only."
+            if brain.kind == "routed":
+                resp = await brain.deep()
+                say_after = ("Claude has every turn now. Say back to the "
+                             "fast model to hand it back.")
+            else:
+                mouth.say("Switching to the deep model. Heads up, replies "
+                          "get slower. Say back to the fast model when "
+                          "you're done.")
+                resp = await brain.deep()
+                say_after = "Deep model online, for this session only."
         elif verb == "fast":
-            resp = await brain.command(f"/model {CFG['model']}")
-            say_after = "Back on the fast model."
+            resp = await brain.fast()
+            say_after = ("Back to the local model, with Claude on call."
+                         if brain.kind == "routed"
+                         else "Back on the fast model.")
         elif verb.startswith("effort:"):
             lvl = verb.split(":", 1)[1]
-            resp = await brain.command(f"/effort {lvl}")
+            resp = await brain.set_effort(lvl)
             saved = _write_config_key("effort", lvl)
             say_after = (f"Effort set to {lvl}, and saved as your "
                          "default." if saved else

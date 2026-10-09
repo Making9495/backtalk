@@ -54,6 +54,53 @@ DEFAULTS = {
     # lasts one session and is always spoken; this default never moves
     # by itself.
     "deep_model": "claude-opus-5",
+    # WHICH brain answers. "claude" (the default) is the Claude Code
+    # session above, tools and all. "local" is a model on this machine
+    # (the "local" block below): free, private, quick, and TALK ONLY,
+    # no files, commands or web. "routed" puts the local model up front
+    # and hands a turn to Claude when it sounds like real work (the
+    # "router" block below), or when you say "think harder ...".
+    "brain": "claude",
+    # The local model, for brain "local" or "routed". Any OpenAI-
+    # compatible server: Ollama (the default URL), llama.cpp's
+    # llama-server (http://127.0.0.1:8080/v1), vLLM, LM Studio.
+    # deep_model is optional: set it and "switch to the deep model"
+    # moves to it in "local" mode. strip_think drops the <think>
+    # scratch work reasoning models stream inline (unspeakable).
+    # extra_body is passed through to the server as-is, e.g.
+    # {"temperature": 0.7}. max_history counts messages, not turns.
+    # Size the model to your GPU: it shares VRAM with whisper and
+    # Kokoro. An 8B model at 4-bit (about 5 GB) suits an 8 GB card; a
+    # 4B one answers faster still. Prefer a NON-reasoning model for
+    # voice: strip_think hides a reasoning model's scratch work but
+    # you still sit in silence while it thinks.
+    "local": {
+        "base_url": "http://127.0.0.1:11434/v1",
+        "model": "llama3.1:8b",
+        "deep_model": "",
+        "api_key": "",
+        "max_history": 40,
+        "timeout_s": 60,
+        "strip_think": True,
+        "extra_body": {},
+    },
+    # Routed mode's rules, read top to bottom: an utterance that STARTS
+    # with an escalate phrase goes to Claude, then one that CONTAINS an
+    # escalate word (whole words, any case), else the local model
+    # answers. "switch to the deep model" sends every turn to Claude
+    # until "back to the fast model". handoff_turns is how many recent
+    # local exchanges Claude is briefed on when a turn reaches it.
+    "router": {
+        "escalate_phrases": ["think harder", "ask claude", "use claude",
+                             "hand this to claude", "go deep"],
+        "escalate_words": ["file", "files", "folder", "code", "script",
+                           "run", "command", "install", "fix", "debug",
+                           "search", "look up", "web", "email",
+                           "calendar", "vault", "note", "notes",
+                           "remember", "write", "edit", "create",
+                           "delete"],
+        "handoff_turns": 6,
+    },
     # Tool permissions for the voice session. "ask" is the default ON
     # PURPOSE (safety is opt-out, never opt-in): when the agent wants a
     # gated tool (write a file, run a real command), it ASKS OUT LOUD

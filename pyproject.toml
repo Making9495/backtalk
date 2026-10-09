@@ -4,7 +4,10 @@ version = "1.0.0"
 description = "Talk to your Claude Code agent out loud. Hold a key, speak, and it answers in a real voice."
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "claude-agent-sdk>=0.2.100",
+    # PINNED, not a floor: brains/claude.py reaches one private SDK call
+    # (_send_control_request, for the usage readout) and parses stream
+    # events by class name. Bump on purpose, after a voice smoke test.
+    "claude-agent-sdk==0.2.163",
     "faster-whisper>=1.0.0",
     "httpx>=0.27.0",
     "kokoro>=0.9.0",
@@ -26,6 +29,13 @@ dependencies = [
     "webrtcvad>=2.0.10 ; sys_platform != 'win32'",
     "webrtcvad-wheels>=2.0.10 ; sys_platform == 'win32'",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
 
 [tool.setuptools]
 packages = ["backtalk"]
