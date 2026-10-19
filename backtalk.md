@@ -2,12 +2,12 @@
 name: backtalk
 description: Interactive setup for backtalk, the voice loop that lets you talk to your Claude Code agent out loud. Run it inside Claude Code from the repo folder. It verifies the install, finds the person's agent, configures the key and the voice, wires the optional integrations, and test-fires the loop. Load it and run it interactively. Do not skip phases. Do not improvise.
 version: 1.0
-author: Jared Rhodenizer (@jaredrhod)
+author: Making9495, based on backtalk by Jared Rhodenizer
 ---
 
 # backtalk: setup
 
-By **Jared Rhodenizer** (@jaredrhod) · github.com/jaredrhod/backtalk
+Part of **FS-Home-Assistant** · github.com/Making9495/backtalk
 
 You are reading a system builder file. You, an AI assistant, will follow it to set up backtalk for the person who opened it. Do not summarize this file. Do not describe it. Execute it.
 
@@ -31,7 +31,7 @@ Ask: **"Do you already have a Claude Code agent, a folder with a CLAUDE.md that 
 Never default `agent_dir` to whatever folder Claude Code happens to be running in: an unrelated project is not an agent, and wiring the voice to one gives the person a voice with no one behind it. If there is no real agent folder, use one of the two paths below.
 
 - **Yes:** get the folder's path. That's `agent_dir`. Ask the agent's name for `name` (it builds the quit phrases, "goodbye <name>" hangs up, and labels the log).
-- **No:** point them at **ai-memory-vault** (github.com/jaredrhod/ai-memory-vault), the full build that creates an agent with persistent memory, and it ships with a ready-made personality (Jarvis) they can keep, rename, or replace. Offer to pause here while they run that first (it's the better order), or set `agent_dir` to a folder of their choice with a minimal CLAUDE.md you write together now (a name, a role, a few lines of personality) as a starter.
+- **No:** point them at **ai-memory-vault** (github.com/Making9495/ai-memory-vault), the full build that creates an agent with persistent memory, and it ships with a ready-made personality (Jarvis) they can keep, rename, or replace. Offer to pause here while they run that first (it's the better order), or set `agent_dir` to a folder of their choice with a minimal CLAUDE.md you write together now (a name, a role, a few lines of personality) as a starter.
 
 ## Phase 3: The key and the voice
 
@@ -46,7 +46,7 @@ Never default `agent_dir` to whatever folder Claude Code happens to be running i
 5. **If they pick ElevenLabs, walk them through it end to end; never hand them a to-do list.**
    - **Account and key:** they sign up at elevenlabs.io (the free tier is fine to start) and create an API key (profile menu, API Keys).
    - **Seed the key into the system's secret store. The key never goes in a config file, any file, ever, and never gets pasted into this chat.** macOS: run `security add-generic-password -a "$USER" -s backtalk-elevenlabs -T /usr/bin/security -w` and have THEM paste the key at the terminal prompt. Linux: `secret-tool store --label backtalk service backtalk-elevenlabs`. Windows: no native store is wired yet, so the `ELEVENLABS_API_KEY` environment variable is the path: have THEM run `setx ELEVENLABS_API_KEY "their-key-here"` in their own PowerShell window, tell them plainly that stores the key readable on disk for their user account, and that newly opened programs see it (so start the voice line from a fresh window).
-   - **Pick the voice by ear, never by making them hunt IDs.** Fetch their available voices live from the API: `GET https://api.elevenlabs.io/v1/voices` with the `xi-api-key` header, reading the key back out of the store you just seeded. Every account includes ElevenLabs' premade voices with names, descriptions, and `voice_id`s. If they want the exact voice from Jared's videos, skip the hunt: it is called **Tarquin** in the ElevenLabs voice library; search it by name and use its voice_id. Otherwise offer a shortlist matched to what they want (male or female, accent, register), set `elevenlabs.enabled: true` and the first candidate's `voice_id` in `backtalk.json`, and audition through backtalk's own mouth: `python -m backtalk.mouth "Hello there. This is what I sound like."` Swap the `voice_id` and repeat until they're happy. Write the winner.
+   - **Pick the voice by ear, never by making them hunt IDs.** Fetch their available voices live from the API: `GET https://api.elevenlabs.io/v1/voices` with the `xi-api-key` header, reading the key back out of the store you just seeded. Every account includes ElevenLabs' premade voices with names, descriptions, and `voice_id`s. If they want a ready-made pick, skip the hunt: offer **Tarquin** from the ElevenLabs voice library; search it by name and use its voice_id. Otherwise offer a shortlist matched to what they want (male or female, accent, register), set `elevenlabs.enabled: true` and the first candidate's `voice_id` in `backtalk.json`, and audition through backtalk's own mouth: `python -m backtalk.mouth "Hello there. This is what I sound like."` Swap the `voice_id` and repeat until they're happy. Write the winner.
    - **Confirm `ffmpeg` is installed:** `brew install ffmpeg` (macOS) / `apt install ffmpeg` (Linux) / `winget install Gyan.FFmpeg` (Windows), then verify `ffmpeg -version` runs from a fresh shell.
 
 ## Phase 4: Optional integrations
@@ -54,8 +54,8 @@ Never default `agent_dir` to whatever folder Claude Code happens to be running i
 Ask about each, configure what they want:
 
 - **A face:** two companions read the signal bus this repo writes.
-  - **ai-visualizer** (github.com/jaredrhod/ai-visualizer): four full-screen faces including the circuit board. Either set `signals_dir` here to that repo's folder, or set `bus_dir` there to this folder. One direction, not both.
-  - **barehands** (github.com/jaredrhod/barehands): set `barehands_state_dir` to its `state/` folder path and the on-screen ring becomes the agent's face, live with the voice.
+  - **ai-visualizer** (github.com/Making9495/ai-visualizer): four full-screen faces including the circuit board. Either set `signals_dir` here to that repo's folder, or set `bus_dir` there to this folder. One direction, not both.
+  - **barehands** (github.com/Making9495/barehands): set `barehands_state_dir` to its `state/` folder path and the on-screen ring becomes the agent's face, live with the voice.
   If they have neither, one sentence: "there are companion repos that give it a face on screen, for later if you want."
 - **Extra folders:** anything beyond `agent_dir` the agent should reach in voice sessions (a notes vault, a projects folder) goes in `extra_dirs`.
 - **Permissions (ask which mode, then YOU write their choice).** The default is `"ask"`: when the agent wants a gated action mid-conversation, it asks OUT LOUD in plain words (never paths or command syntax; "details" reads the literal form on request) and waits; an exact spoken yes approves, any other answer denies and becomes the reason it passes back; silence for about 75 seconds means no; most read-only work passes without asking. The first ask of a session mentions the off switch by name. Explain that, then offer the alternative honestly: `"bypassPermissions"` is fully hands-free, which is smoother and also means the agent can act on a mistake without a checkpoint. Call the hands-free-of-permissions mode by its real name, **auto-approve**, and never "hands-free" (that word belongs to the microphone). Ask which they want and write it into `backtalk.json` yourself. Tell them it is never welded shut: they can tell their agent to change it in any session (it takes effect at the next launch), or say "stop asking for permission" (then "confirm") or "start asking again" inside a voice session for an immediate flip that saves itself.
@@ -94,7 +94,7 @@ They have a voice now, and they just heard it work. Before you hand over, tell t
 
 **Two honest paths, and say which one fits them:**
 
-1. **They want ONE more piece and nothing else.** Fastest route: say the sentence to you, right here, right now. Each repo installs from one line, for example *"clone https://github.com/jaredrhod/barehands.git, then read barehands/barehands.md and set me up."* You do it in this session and they are done.
+1. **They want ONE more piece and nothing else.** Fastest route: say the sentence to you, right here, right now. Each repo installs from one line, for example *"clone https://github.com/Making9495/barehands.git, then read barehands/barehands.md and set me up."* You do it in this session and they are done.
 2. **They want the pieces WIRED TOGETHER, plus the Desktop shortcuts.** That is what the full installer is for. It finds what they already have, keeps it exactly where it is, adds only what is missing, and connects everything. It never duplicates a piece they already use and it never deletes anything they built.
 
 **If they choose the installer, be precise about how it runs, because this trips people up:** it has to start in a NEW terminal window (PowerShell on Windows), not inside this session. That is not a technicality: the installer only becomes the installer when it opens in its own folder, and it will interview them from scratch about which pieces they want.
@@ -103,17 +103,15 @@ Give them the command for their machine:
 
 Mac and Linux:
 ```
-mkdir -p ~/my-agent && cd ~/my-agent && git clone https://github.com/jaredrhod/fullstack-agent && cd fullstack-agent && claude "set me up"
+mkdir -p ~/my-agent && cd ~/my-agent && git clone https://github.com/Making9495/FS-Home-Assistant fullstack-agent && cd fullstack-agent && claude "set me up"
 ```
 
 Windows (PowerShell):
 ```
-$d="$env:USERPROFILE\.local\bin"; if (Test-Path "$d\claude.exe") { $env:Path="$d;$env:Path" }; New-Item -ItemType Directory -Force -Path $HOME\my-agent | Out-Null; cd $HOME\my-agent; if (-not (Test-Path fullstack-agent\fullstack-agent.md)) { Invoke-WebRequest https://github.com/jaredrhod/fullstack-agent/archive/refs/heads/main.zip -OutFile fsa.zip; Expand-Archive fsa.zip . -Force; New-Item -ItemType Directory -Force -Path fullstack-agent | Out-Null; Get-ChildItem fullstack-agent-main -Force | Copy-Item -Destination fullstack-agent -Recurse -Force; Remove-Item fullstack-agent-main -Recurse -Force; Remove-Item fsa.zip }; cd fullstack-agent; if (Get-Command claude -ErrorAction SilentlyContinue) { claude "set me up" } else { Write-Output "Claude Code is not installed yet. Install it first at https://jaredrhod.com/start then paste this again." }
+$d="$env:USERPROFILE\.local\bin"; if (Test-Path "$d\claude.exe") { $env:Path="$d;$env:Path" }; New-Item -ItemType Directory -Force -Path $HOME\my-agent | Out-Null; cd $HOME\my-agent; if (-not (Test-Path fullstack-agent\fullstack-agent.md)) { Invoke-WebRequest https://github.com/Making9495/FS-Home-Assistant/archive/refs/heads/main.zip -OutFile fsa.zip; Expand-Archive fsa.zip . -Force; New-Item -ItemType Directory -Force -Path fullstack-agent | Out-Null; Get-ChildItem FS-Home-Assistant-main -Force | Copy-Item -Destination fullstack-agent -Recurse -Force; Remove-Item FS-Home-Assistant-main -Recurse -Force; Remove-Item fsa.zip }; cd fullstack-agent; if (Get-Command claude -ErrorAction SilentlyContinue) { claude "set me up" } else { Write-Output "Claude Code is not installed yet. Install it first at https://docs.claude.com/en/docs/claude-code/setup then paste this again." }
 ```
 
 Tell them what to expect: a fresh Claude Code session opens with the installer already talking. It asks their name, who their agent should be, and which pieces they want. Anything they already have gets found and kept. Their voice config gets found and kept, and the face gets pointed at the status files this install already writes.
-
-**Then point them at the room.** Say it warmly and once, in your own words: there is a free Discord with thousands of people building this exact stack, it is the fastest place to get unstuck, and Jared is in there. https://discord.gg/YSdsqMv3V8 . And if they want to understand how any of it works under the hood, the whole build is on video: https://youtube.com/@jaredrhod
 
 Offer all of this, do not push it. If they say "just this piece for now," tell them good choice and get out of the way.
 
@@ -144,7 +142,7 @@ If they already installed through fullstack-agent, they have these shortcuts alr
 
 Show them the two commands that matter (`./run.sh`, and "goodbye <name>" to end), where the log lives (`logs/backtalk.log`), and that `backtalk.json` is theirs to tinker with (though they never need to touch it by hand: YOU change it when they ask, in any session, and the voice console changes it live).
 
-**Tell them how updates work, once.** Jared ships fixes to this repo often, several straight from this community. Any time, in any session, they can say: "pull the latest backtalk and tell me what changed." Their config and identity are never touched by an update.
+**Tell them how updates work, once.** This repo gets fixes regularly. Any time, in any session, they can say: "pull the latest backtalk and tell me what changed." Their config and identity are never touched by an update.
 
 **Show them the voice console, once.** Exact phrases, spoken alone, control the session itself: "clear the session", "compact the session", "switch to the deep model" / "back to the fast model", "set effort to low" (or medium, high, max), "usage report", "go hands free" / "push to talk mode" for the microphone, and "stop asking for permission" / "start asking again" for approvals. Words around a phrase make it a normal sentence for the agent instead, so nothing fires by accident. Close with the point of the whole thing: this is the same assistant they type to (same memory, same personality); it just talks now.
 

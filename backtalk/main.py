@@ -1,5 +1,6 @@
 # backtalk: talk to your Claude Code agent out loud.
 # Copyright (C) 2026 Jared Rhodenizer
+# Modifications copyright (C) 2026 Making9495
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -297,7 +298,7 @@ def make_permission_gate(mouth):
 
 # ---- THE VOICE CONSOLE: session verbs, spoken. Exact phrases only,
 # spoken alone, so ordinary sentences can never trigger them. (Grown
-# from a community member's own build shared in the Discord.)
+# from a community member's own build.)
 CONSOLE_VERBS = {
     "clear":     ("clear the session", "clear the context",
                   "clear context", "fresh slate", "slash clear"),
