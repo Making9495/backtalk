@@ -1,5 +1,6 @@
 # backtalk: talk to your Claude Code agent out loud.
 # Copyright (C) 2026 Jared Rhodenizer
+# Modifications copyright (C) 2026 Making9495
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -237,7 +238,7 @@ DEFAULTS = {
     # THE BAREHANDS SEAM: point this at a barehands checkout's state/
     # folder and its on-screen ring becomes your agent's face — it
     # breathes while idle, spins while thinking, pulses with the voice.
-    # (github.com/jaredrhod/barehands)
+    # (github.com/Making9495/barehands)
     "barehands_state_dir": "",
     # Sound played while the agent thinks, so a long pause never reads as
     # a dead line. The bundled one ships in assets/; a relative path
